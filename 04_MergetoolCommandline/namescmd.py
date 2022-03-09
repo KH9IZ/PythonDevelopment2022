@@ -1,3 +1,4 @@
+import re
 import shlex
 import cmd
 import readline
@@ -11,7 +12,11 @@ class NamesCmd(cmd.Cmd):
     prompt = ">._.>> "
     races = defaultdict(dict)
     for subrace in get_all_generators():
-        races[subrace.__module__.split('.')[2]][subrace.__name__] = subrace
+        temp = subrace.__name__.replace("Generator", "")
+        temp = temp.replace("Fullname", "")
+        temp = temp.replace("Names", "").lower()
+        
+        races[subrace.__module__.split('.')[2]][temp] = subrace
     
 
     def do_language(self, lang):
@@ -45,7 +50,20 @@ class NamesCmd(cmd.Cmd):
 
 
     def complete_generate(self, prefix, s, start_prefix, end_prefix):
-        ...
+        args = s.split()
+
+        if len(args) == 1 or len(args) == 2 and prefix:
+            return [race for race in self.races.keys() if race.startswith(prefix)]
+
+        if len(args) == 2 or len(args) == 3 and prefix:
+            race = self.races.get(args[1], {})
+
+            return [subrace for subrace in race.keys() if subrace.startswith(prefix)]
+
+        if len(args) == 3 or len(args) == 4 and prefix:
+            return [gen for gen in ('male', 'female') if gen.startswith(prefix)]
+
+        return []
     
     def do_info(self, arg):
         """Gives info about generator"""
@@ -72,19 +90,19 @@ class NamesCmd(cmd.Cmd):
 
 
     def complete_info(self, prefix, s, start_prefix, end_prefix):
-        ...
-    
+        return self.complete_generate(prefix, s, start_prefix, end_prefix) + ['language'] if 'language'.startswith(prefix) else []
+
     def get_generator(self, args):
         race = {}
         gen = None
         for arg in args:
             if arg in self.races.keys():
                 race = self.races[arg]
-            elif arg in race.keys():
-                gen = race[args]
+            elif t := next((subrace for subrace in race.keys() if subrace.startswith(arg)), False):
+                gen = race[t]
 
         if not race:
-            raise Exception(f"Unknown race{': ' + race[0] if len(race) > 0 else ''}.")
+            raise ValueError(f"Unknown race{': ' + next(iter(race)) if len(race) > 0 else ''}.")
         if gen is None:
             gen = next(iter(race.values()))
         return gen
